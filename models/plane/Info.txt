@@ -1,0 +1,19 @@
+Rocket Racer
+************
+
+Rocket Racer is a fiction model of racing aircraft from near future. First prototype of this arcraft is existing in Real. But final look is'nt existing. This is simply model without interier and pilot.
+
+Aicraft control is resolve in C4d version with XPresso:
+
+Cocpit Open: You can open cocpit cover. 0 % - Cocpit is closed, 100 % - Cocpit is full opened
+
+Rear Bank: Ailerons on the rear wing rotate against for aircraft banking
+
+Rear Pitch: Ailerons on the rear wing rotate uniformly for aircraft Pitching. Rear Pitch and Rear Bank are adding for final aileron position.
+
+Front Bank and Front Pitch: Are same function, but on the Front small wing.
+
+Rudder: Rudders rotate uniformly for aircraft heading.
+
+On the Ground: If checked, front gear rotate synchronous with rudder. Else Front gear is locked in neutral position. 
+

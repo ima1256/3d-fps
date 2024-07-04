@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Camera Look At</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #cross {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: url('path/to/your/image_or_svg.svg') no-repeat center center;
+            background-size: contain;
+            pointer-events: none; /* Prevent pointer events on the cross */
+        }
+    </style>
+</head>
+<body>
+    <div id="cross"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Position the camera
+        camera.position.z = 5;
+
+        // Add an example object to the scene
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        // Get the cross element
+        const cross = document.getElementById('cross');
+
+        // Function to update the cross position
+        function updateCrossPosition() {
+            // Get the camera's direction vector
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+
+            // Set the position of the cross in front of the camera
+            const cameraPosition = camera.position.clone();
+            const distance = 10; // Adjust the distance as needed
+            const crossPosition = cameraPosition.add(direction.multiplyScalar(distance));
+
+            // Convert the cross position to 2D screen coordinates
+            const vector = crossPosition.project(camera);
+            const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+            const y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
+
+            // Update the cross element position
+            cross.style.left = `${x - cross.offsetWidth / 2}px`;
+            cross.style.top = `${y - cross.offsetHeight / 2}px`;
+        }
+
+        // Call updateCrossPosition in your render loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update the cross position
+            updateCrossPosition();
+
+            // Render the scene
+            renderer.render(scene, camera);
+        }
+
+        // Start the animation loop
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
