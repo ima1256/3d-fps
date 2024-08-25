@@ -141,6 +141,7 @@ function shoot() {
 
     // Store projectile for updating
     projectiles.push({ mesh: projectileMesh, body: projectileBody });
+    
 }
 
 let isSimulationPaused = false;

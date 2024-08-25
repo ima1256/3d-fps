@@ -178,6 +178,7 @@ export async function loadModel(scene, path) {
 }
 
 export function HSVtoHSL(h, s, v) {
+
     let l = (2 - s) * v / 2;
 
     if (l !== 0) {
@@ -215,9 +216,24 @@ export class CameraAudioManager {
             sound.setBuffer( buffer );
             sound.setRefDistance( 20 );
 
+            if (tag == "bullet_hit") 
+                sound.setVolume(1.0); // Adjust the volume level as needed (0.0 to 1.0)
+
             this.sounds[tag] = sound
         });
 
+    }
+
+    getSounds(subTag) {
+        let res = {}
+
+        for ( let key of Object.keys(this.sounds)) {
+     
+            if (key.indexOf(subTag) == 0)
+                res[key] = this.sounds[key]
+        }
+
+        return res
     }
 
     getSound(tag) {

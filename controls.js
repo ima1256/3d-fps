@@ -34,6 +34,8 @@ export class InputController {
         // Load the sound
         this.clickSound = new Audio('./audio/bo2-dsr-sniper.mp3');
 
+        this.alreadyShoot = false
+
         document.addEventListener('mousedown', (e) => this.onMouseDown_(e), false);
         document.addEventListener('mouseup', (e) => this.onMouseUp_(e), false);
         document.addEventListener('mousemove', (e) => this.onMouseMove_(e), false);
@@ -46,12 +48,15 @@ export class InputController {
         this.sm = sm
     }
 
-    onMouseDown_(e) {
+    async onMouseDown_(e) {
         switch (e.button) {
             case 0: {
                 this.current_.leftButton = true;
-                if (this.characterId === localStorage.getItem('characterId') ) 
-                    this.sm.shoot()
+                
+                if (this.characterId === localStorage.getItem('characterId') ) {
+                    await this.sm.shoot()
+                }   
+
                 break;
             }
             case 2: {

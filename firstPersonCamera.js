@@ -1,14 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { getSceneFloor, getWorldSphere, getWorldSky, checkCollision, getSpotlight, loadModel, getSunlight, HSVtoHSL, CameraAudioManager } from './functions';
-import Stats from "three/examples/jsm/libs/stats.module.js";
-import { FirstPersonCamera } from './controls';
-import { lerp } from 'three/src/math/MathUtils.js';
 import { World3d } from './3dworldManager';
-import { ShootingManager } from './ShootingManager';
-import { FBXLoader } from 'three/examples/jsm/Addons.js';
-import { createHealthBar } from './utils';
-import { Character } from './character';
+import { Character, Enemy } from './character';
 
 const world3d = new World3d()
 world3d.initialize().then( async () => {
@@ -34,15 +26,17 @@ window.document.body.appendChild( renderer.domElement );
 window.addEventListener("resize", onWindowResize, false);
 
 function onWindowResize() {
+  
   for (let i = 0; i < numCharacters; i++) {
-    
     characters[i].camera.aspect = window.innerWidth / window.innerHeight;
     characters[i].camera.updateProjectionMatrix();
   }
-  camera1.aspect = window.innerWidth / window.innerHeight;
-  camera1.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  render();
+
+  camera1.aspect = window.innerWidth / window.innerHeight
+  camera1.updateProjectionMatrix()
+  renderer.setSize(window.innerWidth, window.innerHeight)
+
+  render()
 }
 //SETUP CONFIGURATION FINISH
 
@@ -50,30 +44,57 @@ var characterIndex = 0
 let camera = camera1
 let characters = []
 let numCharacters = 1
+let characterCamera = true
 
 let character
 let zombie
+
+let enemy 
 
 
 for (let i = 0; i < numCharacters; i++) {
 
   let char = new Character(world3d, i+1)
+
   char.initialize().then(() => {
+
     characters.push(char)
+
     if (i == 0) {
+      
       localStorage.setItem('characterId', char.uid)
       character = char
   
       world3d.loadModel('models/walking_zombie2.glb', 'zombie').then(res => {
-        console.log(res)
+        
         zombie = res
-        zombie.children[0].children[0].children[0].name = 'zombie'
+        zombie.name = 'my_zombie'
         character.addTarget(zombie)
         const zombieScale = 5
         zombie.scale.set(zombieScale, zombieScale, zombieScale)
+
+        let sounds = character.camAudioManager.getSounds('zombie')
+        let sounds2 = character.camAudioManager.getSounds('bullet_hit')
+
+        sounds = {...sounds, ...sounds2}
+
+        console.log(sounds)
+
+        for (let sound of Object.keys(sounds)) zombie.add(sounds[sound])
+
+        enemy = new Enemy(sounds)
+
+        //enemy.yell()
+
+        zombie.userData.sounds = enemy.sounds
+
+        console.log('load', zombie)
+        
+
       })
   
     } 
+
   })
 
 
@@ -101,9 +122,9 @@ document.addEventListener('keydown', function(event) {
 
   if (event.key === '1') {
       // Perform your desired action here
-      camera = camera1
+      characterCamera = false
   }else if (event.key === '2') {
-      camera = characters[characterIndex].camera
+      characterCamera = true
   }
 
 });
@@ -115,9 +136,31 @@ document.addEventListener('keydown', function(event) {
 
 //LIGHTS AND WORLD FINISH
 // character.camAudioManager.getSound('zombies_round').play()
-document.getElementById('startButton').addEventListener('click', () => {
-  character.camAudioManager.getSound('zombies_round').play()
-})
+// document.getElementById('startButton').addEventListener('click', () => {
+//   character.camAudioManager.getSound('zombies_round').play()
+// })
+
+
+//PhysicsWorld  START 
+
+let physicsWorld;
+let rigidBodies = [];
+let tmpTrans = new Ammo.btTransform();
+
+function initPhysics() {
+    // Set up the physics world configuration
+    const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+    const dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
+    const broadphase = new Ammo.btDbvtBroadphase();
+    const solver = new Ammo.btSequentialImpulseConstraintSolver();
+
+    // Create the physics world
+    physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+    physicsWorld.setGravity(new Ammo.btVector3(0, -9.8, 0)); // Set gravity
+}
+
+
+//PhysicsWorld FINISH
 
 
 //INFINITE LOOP START
@@ -132,6 +175,11 @@ function animate() {
     if (zombie && character.character) {
 
       // console.log('zombie', zombie)
+
+      if (characterCamera) 
+        camera = characters[characterIndex].camera
+      else
+        camera = camera = camera1
       
       // console.log('zombie', zombie.position)
       // console.log('char', character.character.position)
@@ -146,8 +194,16 @@ function animate() {
 
       const distance = zombiePosition.distanceTo(cameraPosition);
 
-      if (distance > 1) { // Minimum distance to follow
-          zombie.position.add(direction.multiplyScalar(0.1)); // Move the zombie towards the camera
+      if (distance > 10) { // Minimum distance to follow
+          zombie.position.add(direction.multiplyScalar(0.4)); // Move the zombie towards the camera
+      } else {
+        let sound = character.camAudioManager.getSound('zombie_hit')
+        
+        if (!sound.isPlaying) {
+          //sound.play()
+          character.showBloodEffect()
+        }
+          
       }
 
       zombie.lookAt(character.character.position); // Make the zombie look at the camera

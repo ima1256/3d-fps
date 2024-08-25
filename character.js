@@ -8,6 +8,7 @@ export class Character {
 
     constructor(world3d, layer) {
 
+        this.initialized = false
         this.world3d = world3d
         this.uid = generateUUID()
         this.health = 100
@@ -23,27 +24,36 @@ export class Character {
                 this.camera.layers.enable(i)
             else
                 this.camera.layers.disable(i)
+
         }
 
         this.world3d.scene.add(this.camera);
-
         let camAudioManager = new CameraAudioManager(this.camera)
 
-        // camAudioManager.loadSound('./audio/linkedin_msg.mp3'}, 'linkedin_msg')
-        // camAudioManager.loadSound('./audio/zombie_yell.mp3', 'zombie_yell')
         let audioFolder = './audio/'
         camAudioManager.loadSound(audioFolder + 'm4_silencer.mp3', 'm4_silencer')
-        camAudioManager.loadSound(audioFolder + 'cod_zombies_round.mp3', 'zombies_round')
-        let zombiesFolder = 'zombies/'
-        // camAudioManager.loadSound(audioFolder + zombiesFolder, 'zombie_35.mp3' )
-        // camAudioManager.loadSound(audioFolder + zombiesFolder, 'zombie_38.mp3' )
-        // camAudioManager.loadSound(audioFolder + zombiesFolder, 'zombie_39.mp3' )
-        // camAudioManager.loadSound(audioFolder + zombiesFolder, 'zombie_40.mp3' )
-        // camAudioManager.loadSound(audioFolder + zombiesFolder, 'zombie_41.mp3' )
+        camAudioManager.loadSound(audioFolder + 'blaster.mp3', 'blaster')
+        camAudioManager.loadSound(audioFolder + 'cod_zombies_round.mp3', 'cod_zombies_round')
+        camAudioManager.loadSound(audioFolder + 'linkedin_msg.mp3', 'linkedin_msg')
+        camAudioManager.loadSound()
+
+
+        let zombiesFolder = audioFolder + 'zombies/'
+        camAudioManager.loadSound(zombiesFolder + 'zombie_35.mp3', "zombie_35");
+        camAudioManager.loadSound(zombiesFolder + 'zombie_38.mp3', "zombie_38");
+        camAudioManager.loadSound(zombiesFolder + 'zombie_39.mp3', "zombie_39");
+        camAudioManager.loadSound(zombiesFolder + 'zombie_40.mp3', "zombie_40");
+        camAudioManager.loadSound(zombiesFolder + 'zombie_41.mp3', "zombie_41");
+
+        camAudioManager.loadSound(zombiesFolder + 'human_zombie_hit.mp3', "zombie_hit");
+        camAudioManager.loadSound(zombiesFolder + 'bullet_hit.mp3', 'bullet_hit')
+        
 
         this.camAudioManager = camAudioManager
 
         this.fpsCamera = new FirstPersonCamera(this.uid, this.camera)
+
+        this.bloodMesh = this.#getBloodMesh()
       
 
     }
@@ -51,6 +61,7 @@ export class Character {
     async initialize() {
         await this.loadCharacter()
         await this.loadWeapon()
+        this.initialized = true
     }
 
     getRandomPosition(min, max) {
@@ -96,7 +107,7 @@ export class Character {
         const scale = 0.0005
         gun.scale.set(scale, scale, scale)
 
-        gun.sound = this.camAudioManager.getSound('m4_silencer')
+        gun.sound = this.camAudioManager.getSound('blaster')
         gun.sound.setVolume(0.3)
         gun.add(gun.sound)
       
@@ -121,6 +132,45 @@ export class Character {
 
     addTarget(target) {
         this.sm.addTarget(target)
+    }
+
+    #getBloodMesh() {
+
+        // Load the blood texture
+        const loader = new THREE.TextureLoader();
+        const bloodTexture = loader.load('./images/blood.png');
+
+        // Create a material using the blood texture
+        const bloodMaterial = new THREE.MeshBasicMaterial({
+            map: bloodTexture,
+            transparent: true, // Enable transparency so the background shows through
+            opacity: 0.8 // Adjust opacity for the desired effect
+        });
+
+        // Create a plane geometry that will cover the entire screen
+        const aspect = window.innerWidth / window.innerHeight;
+        const bloodGeometry = new THREE.PlaneGeometry(2 * aspect, 2); // Size it to cover the screen
+
+        // Create the mesh
+        const bloodMesh = new THREE.Mesh(bloodGeometry, bloodMaterial);
+
+        // Position the plane in front of the camera
+        bloodMesh.position.set(0, 0, -0.3); // Slightly in front of the camera
+    
+        return bloodMesh
+
+    }
+
+    showBloodEffect() {
+
+
+        // Add the blood mesh to the camera so it appears on the screen
+        this.camera.add(this.bloodMesh);
+    
+        // Set a timeout to remove the blood effect after 1 second (1000 milliseconds)
+        setTimeout(() => {
+            this.camera.remove(this.bloodMesh);
+        }, 3000);
     }
 
     update = (delta) => {
@@ -148,6 +198,34 @@ export class Character {
             // offset.applyQuaternion(camera.quaternion);
             // character.position.add(offset);
         }
+    }
+
+}
+
+
+export class Enemy {
+
+    constructor (sounds) {
+
+        this.uid = generateUUID()
+        this.health = 100
+        this.sounds = sounds
+        this.yellLow = 3
+        this.yellHigh = 6
+
+    }
+
+    yell = () => {
+
+
+        const randomDelay = Math.floor(Math.random() * (this.yellHigh - this.yellLow + 1) + this.yellLow) * 1000;
+  
+        const keys = Object.keys(this.sounds)
+
+        this.sounds[keys[Math.floor(Math.random() * keys.length)]].play()
+      
+        setTimeout(this.yell, randomDelay);
+
     }
 
 }
