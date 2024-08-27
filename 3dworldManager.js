@@ -106,9 +106,40 @@ export class World3d {
     }
 
     loadTerrain() {
+        // Load the texture
+        const textureLoader = new THREE.TextureLoader();
+        const terrainTexture = textureLoader.load('./textures/texture-floor.png'); // Replace with the actual path to your texture
+    
+        terrainTexture.wrapS = THREE.RepeatWrapping;
+        terrainTexture.wrapT = THREE.RepeatWrapping;
+        terrainTexture.repeat.set(1000, 1000);
+
+        // Create the plane geometry
+        const planeGeometry = new THREE.PlaneGeometry(20000, 20000, 20, 20);
+    
+        // Create the material using the loaded texture
+        const planeMaterial = new THREE.MeshStandardMaterial({
+            map: terrainTexture, // Apply the texture to the material
+        });
+    
+        // Create the mesh with the geometry and material
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        
+        // Set the plane's properties
+        plane.castShadow = false;
+        plane.receiveShadow = true;
+        plane.rotation.x = -Math.PI / 2;
+    
+        // Add the plane to the scene
+        this.scene.add(plane);
+        this.terrain = plane;
+    }
+    
+
+    loadTerrain2() {
 
         const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(200, 200, 20, 20),
+        new THREE.PlaneGeometry(20000, 20000, 20, 20),
         new THREE.MeshStandardMaterial({
             color: 0x1e601c
             }));
@@ -147,11 +178,13 @@ export class World3d {
                 let model = gltf.scene;
                 this.scene.add(model);
     
-                model.children[0].children[0].name = name;
-                model.castShadow = true;
+                model.traverse(c => {
+                    model.castShadow = true;
+                })
+                
                 this.models[name] = model
     
-                resolve(model);
+                resolve(gltf);
 
             }.bind(this), undefined, error => {
                 

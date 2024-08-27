@@ -1,0 +1,5 @@
+the zombie hit has to take into account the Y coordinate
+
+If I change tab the movement does not work 
+If I inspect element the movement does not work
+If I change the camera the movement does not work

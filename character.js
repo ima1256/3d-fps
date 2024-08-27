@@ -12,8 +12,8 @@ export class Character {
         this.world3d = world3d
         this.uid = generateUUID()
         this.health = 100
+        this.size 
         this.camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight , 0.1, 100000 );
-        this.camera.position.set(10, 20, 10)
         this.camera.lookAt(new THREE.Vector3(0, 0, 0))
 
         this.layer = layer
@@ -50,12 +50,9 @@ export class Character {
         
 
         this.camAudioManager = camAudioManager
-
         this.fpsCamera = new FirstPersonCamera(this.uid, this.camera)
-
         this.bloodMesh = this.#getBloodMesh()
       
-
     }
 
     async initialize() {
@@ -76,13 +73,19 @@ export class Character {
 
         let healthBar = createHealthBar()
 
-        let character = await this.world3d.loadModel('models/csgo_terrorist.glb', 'player-' + this.uid)
+        let characterGltf = await this.world3d.loadModel('models/csgo_terrorist.glb', 'player-' + this.uid)
+
+        let character = characterGltf.scene
+
         let scale = 0.3
         character.scale.set(scale, scale, scale)
-        character.position.y = 0
-        character.position.x = this.getRandomPosition(-10, 10);
-        character.position.z = this.getRandomPosition(-10, 10)
-        //this.world3D.scene.add(character)
+
+
+        character.position.y = 50
+        character.position.x =  20//this.getRandomPosition(-10, 10);
+        character.position.z = 20//this.getRandomPosition(-10, 10)
+
+        this.character = character
       
         character.traverse((child) => {
             child.layers.set(this.layer);
@@ -91,18 +94,26 @@ export class Character {
         this.world3d.scene.add(healthBar)
         character.add(healthBar);
 
-        healthBar.position.set(0, 80, 0);
+        healthBar.position.set(character.position.x, 80, character.position.z);
         healthBar.layers.set(this.layer)
 
         this.character = character
         this.healthBar = healthBar
 
+        const box = new THREE.Box3().setFromObject(this.character);
+        const size = new THREE.Vector3();
+        box.getSize(size); // Get the size (width, height, depth) of the bounding box
+
+        this.size = size
+
+
     }
 
     loadWeapon = async () => {
 
-        let gun = await this.world3d.loadModel('models/weapons/csgo_weapon_m4.glb', 'gun-' + this.uid)
-        //this.world3d.scene.add(gun);
+        let gunGltf = await this.world3d.loadModel('models/weapons/csgo_weapon_m4.glb', 'gun-' + this.uid)
+
+        let gun = gunGltf.scene
       
         const scale = 0.0005
         gun.scale.set(scale, scale, scale)
@@ -155,7 +166,7 @@ export class Character {
         const bloodMesh = new THREE.Mesh(bloodGeometry, bloodMaterial);
 
         // Position the plane in front of the camera
-        bloodMesh.position.set(0, 0, -0.3); // Slightly in front of the camera
+        bloodMesh.position.set(0, 0, -1.2); // Slightly in front of the camera
     
         return bloodMesh
 
@@ -171,6 +182,7 @@ export class Character {
         setTimeout(() => {
             this.camera.remove(this.bloodMesh);
         }, 3000);
+        
     }
 
     update = (delta) => {
@@ -181,23 +193,30 @@ export class Character {
         let camera = this.camera
 
         if (fpsCamera) fpsCamera.update(delta)
-
-        // Example: Update the position of the mesh dynamically
     
         if (sm) sm.updateBullets()
-    
-        // if (targetBone) targetBone[0].rotation.x += 0.01
-        // // updateCrossPosition()
-        //if (mixer) mixer.update(delta)
+        
     
         if (character) {
-            character.position.copy(camera.position);
-            character.position.set(camera.position.x, camera.position.y-20, camera.position.z)
-            character.rotation.y = camera.rotation.y - Math.PI; // Copy Y-axis rotation
-            // const offset = new THREE.Vector3(0, 0, ); // Adjust -2 to the desired offset
-            // offset.applyQuaternion(camera.quaternion);
-            // character.position.add(offset);
+           this.#copyCharacterPosition()
         }
+    }
+
+    reset() {
+
+    }
+
+    #copyCharacterPosition() {
+        this.camera.position.copy(this.character.position)
+        this.camera.position.y += this.size.y 
+    }
+
+    #copyCameraPosition() {
+        this.character.position.copy(this.camera.position);
+        this.character.rotation.y = this.camera.rotation.y - Math.PI; // Copy Y-axis rotation
+        // const offset = new THREE.Vector3(0, 0, ); // Adjust -2 to the desired offset
+        // offset.applyQuaternion(this.camera.quaternion);
+        // this.character.position.add(offset);
     }
 
 }
@@ -205,14 +224,42 @@ export class Character {
 
 export class Enemy {
 
-    constructor (sounds) {
+    constructor (world3d, sounds, object) {
 
         this.uid = generateUUID()
         this.health = 100
         this.sounds = sounds
         this.yellLow = 3
         this.yellHigh = 6
+        this.object = object
+        this.world3d = world3d
+        this.fadeOutDuration = 5000
 
+    }
+
+    fadeOut = () => {
+
+        setTimeout(() => {
+            this.object.visible = false
+        }, this.fadeOutDuration)
+
+        const material = this.object.material;
+        material.transparent = true;
+    
+        const startTime = Date.now();
+    
+        while (material.opacity > 0) {
+
+            const elapsedTime = Date.now() - startTime;
+            const fadeAmount = 1 - (elapsedTime / duration);
+    
+            // Set the new opacity
+            material.opacity = Math.max(0, fadeAmount);
+    
+        }
+
+        this.world3d.scene.remove(this.object);
+    
     }
 
     yell = () => {

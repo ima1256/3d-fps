@@ -122,6 +122,7 @@ export class InputController {
 export class FirstPersonCamera {
 
     constructor(characterId, camera) {
+
         this.characterId = characterId
         this.camera_ = camera;
         this.input_ = new InputController(characterId);
@@ -133,6 +134,7 @@ export class FirstPersonCamera {
         this.vsensitivity_ = 0.3
         this.headBobActive_ = false;
         this.headBobTimer_ = 0;
+        
     }
 
     update(timeElapsedS) {
