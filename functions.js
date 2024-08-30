@@ -1,6 +1,40 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+export function calculateAnimationSpeed() {
+
+    const startPosition = new THREE.Vector3(
+        -0.0000010052248171632527,
+        14.7579984664917,
+        -4.191243760942598e-7
+    );
+    
+    const endPosition = new THREE.Vector3(
+
+        -0.0000017253214537049644
+,
+        14.757990837097168
+,
+        -4.1667973960102245e-7
+    );
+    
+    // Calculate the distance between the start and end positions
+    const distanceMoved = endPosition.distanceTo(startPosition);
+    
+    // Calculate the duration of the animation
+    const startTime = 0.03333333507180214;
+    const endTime = 4.066666603088379;
+    const duration = endTime - startTime;
+    
+    // Calculate the velocity (distance per second)
+    const velocity = distanceMoved / duration;
+    
+    console.log('Scalar to apply:', velocity);
+
+    return velocity
+    
+}
+
 export function getSceneFloor() {
 
     var displacement = new THREE.TextureLoader().load( "images/terrain2.jpeg" );

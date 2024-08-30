@@ -59,9 +59,6 @@ mesh.add( sound );
 
 
 
-
-
-
 //CONOR Mcgregor
 
 const aspect = 16/9
@@ -257,7 +254,6 @@ loader.load('./models/zombie_reaction.fbx', function (object) {
 });
 
 
-
 world3d.loader.load( 'models/weapons/csgo_weapon_m4.glb', function ( gltf ) {
 
   gun = gltf.scene
@@ -294,3 +290,62 @@ world3d.loader.load( 'models/weapons/csgo_weapon_m4.glb', function ( gltf ) {
   fpsCamera.input_.addShootingManager(sm)
 
 }, undefined, error => console.error( error ) );
+
+
+function run() {
+
+  let action = this.actions['Attack']
+
+  action.clampWhenFinished = true;  // Keeps the model in the last frame of the animation
+
+  let root = this.object.getObjectByName('_rootJoint').children[0]
+  let initialWorldPosition = new THREE.Vector3();
+  let finalWorldPosition = new THREE.Vector3();
+
+  this.mixer.addEventListener('finished', () => {
+
+      console.log('The animation has ended.');
+      root.getWorldPosition(finalWorldPosition);
+
+      const direction = new THREE.Vector3();
+      direction.subVectors(finalWorldPosition, initialWorldPosition)
+
+      console.log('finalObject', this.object)
+
+      console.log(this.object.position)
+
+      
+
+      action.reset()
+
+      //this.object.position.add(direction)
+      //action.play()
+
+
+  });
+
+
+  root.getWorldPosition(initialWorldPosition);
+
+  action.setLoop(THREE.LoopOnce); 
+  action.play()
+
+  // Create a basic sphere
+  const sphereGeometry = new THREE.SphereGeometry(0.5, 32, 32); // Radius 1, 32 width segments, 32 height segments
+  const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color material
+  sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+  //zombie.add(sphere)
+
+}
+
+
+
+this.boxHelperCamera = new THREE.BoxHelper(this.camera, 0xff0000); // Red wireframe box
+this.world3d.scene.add(this.boxHelperCamera);
+
+this.boxHelperGun = new THREE.BoxHelper(this.gun, 0xff0000); // Red wireframe box
+this.world3d.scene.add(this.boxHelperGun);
+
+
+this.character.size = size

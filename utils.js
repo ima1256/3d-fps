@@ -28,7 +28,11 @@ export function createHealthBar() {
     const sprite = new THREE.Sprite(material);
 
     const aspectRatio = canvas.width / canvas.height;
-    sprite.scale.set( 1.5*aspectRatio, 1, 1);
+
+    const scale = 4
+
+    sprite.scale.set( scale*aspectRatio, scale, scale);
+    sprite.updateMatrixWorld(true)
     // sprite.rotation.x = -Math.PI / 2;
 
     return sprite;

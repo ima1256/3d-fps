@@ -1,6 +1,6 @@
 import { ShootingManager } from "./ShootingManager"
 import * as THREE from 'three';
-import { createHealthBar, generateUUID } from "./utils";
+import { createHealthBar, generateUUID, updateHealthBar } from "./utils";
 import { FirstPersonCamera } from "./controls";
 import { CameraAudioManager } from "./functions";
 
@@ -11,10 +11,16 @@ export class Character {
         this.initialized = false
         this.world3d = world3d
         this.uid = generateUUID()
+        this.maxHealth = 100
         this.health = 100
-        this.size 
-        this.camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight , 0.1, 100000 );
-        this.camera.lookAt(new THREE.Vector3(0, 0, 0))
+ 
+        this.dead = false
+        this.size
+        this.boxHelper
+        this.healthBar
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
+        this.body = null
+        this.gun = null
 
         this.layer = layer
 
@@ -47,12 +53,63 @@ export class Character {
 
         camAudioManager.loadSound(zombiesFolder + 'human_zombie_hit.mp3', "zombie_hit");
         camAudioManager.loadSound(zombiesFolder + 'bullet_hit.mp3', 'bullet_hit')
-        
+
 
         this.camAudioManager = camAudioManager
-        this.fpsCamera = new FirstPersonCamera(this.uid, this.camera)
         this.bloodMesh = this.#getBloodMesh()
-      
+
+    }
+
+    setPhysics() {
+
+        const size = this.size
+
+        // const radius = size.x * 0.5; // Assuming width of the character is appropriate for the radius
+        // const height = size.y - 2 * radius; // Subtract the diameter of the capsule ends
+        // const colShape = new Ammo.btCapsuleShape(radius, height);
+
+        // Ammo.js expects half-extents for the btBoxShape
+        const halfExtents = new Ammo.btVector3(size.x * 0.5, size.y * 0.5, size.z * 0.5);
+        const colShape = new Ammo.btBoxShape(halfExtents);
+
+        const transform = new Ammo.btTransform();
+        transform.setIdentity();
+
+        // Use the position of the character's mesh (or Object3D) to set the initial position of the physics body
+        const pos = this.character.position.clone();
+        transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+
+        console.log("Bounding Box:", this.box);
+        console.log("Character Position:", this.character.position);
+        console.log("Adjusted Position:", pos.y);
+        console.log("Character", this.character)
+
+        // Motion state and local inertia
+        const motionState = new Ammo.btDefaultMotionState(transform);
+        const localInertia = new Ammo.btVector3(0, 0, 0);
+        const mass = 80
+        colShape.calculateLocalInertia(mass, localInertia); // Mass = 1
+
+        // Set the collision margin
+        colShape.setMargin(0.5); // Adjust the margin as needed
+
+        const rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+        const body = new Ammo.btRigidBody(rbInfo);
+
+        body.activate()
+        // body.setDamping(0.9, 0.9); // Set damping factors for linear and angular motion
+
+        body.setFriction(0.1);    // Adjust friction
+        body.setRestitution(0.2); // Lower restitution to avoid bouncing
+
+        this.setBody(body)
+
+        return body
+    }
+
+    setBody(body) {
+        this.body = body
+        this.fpsCamera.setBody(body)
     }
 
     async initialize() {
@@ -69,42 +126,104 @@ export class Character {
         this.health -= 10
     }
 
-    loadCharacter = async () => {
+    initBBox = () => {
+        this.boxHelper = new THREE.BoxHelper(this.character.children[0], 0xff0000); // Red wireframe box
+        //this.world3d.scene.add(this.boxHelper);
+        this.box = new THREE.Box3().setFromObject(this.character);
+        const size = new THREE.Vector3();
+        this.box.getSize(size); // Get the size (width, height, depth) of the bounding box
+        this.size = size
+
+        //this.size.multiply(this.scale);
+        
+        const center = new THREE.Vector3()
+        this.box.getCenter(center)
+        this.center = center
+    }
+
+    initHealthBar = () => {
+
+        let character = this.character
 
         let healthBar = createHealthBar()
 
-        let characterGltf = await this.world3d.loadModel('models/csgo_terrorist.glb', 'player-' + this.uid)
+        const mult = 1/this.scale
 
-        let character = characterGltf.scene
+        healthBar.position.set(0, this.size.y*mult * 1.05 , 0)
 
-        let scale = 0.3
-        character.scale.set(scale, scale, scale)
-
-
-        character.position.y = 50
-        character.position.x =  20//this.getRandomPosition(-10, 10);
-        character.position.z = 20//this.getRandomPosition(-10, 10)
-
-        this.character = character
-      
-        character.traverse((child) => {
-            child.layers.set(this.layer);
-        });
-      
-        this.world3d.scene.add(healthBar)
-        character.add(healthBar);
-
-        healthBar.position.set(character.position.x, 80, character.position.z);
         healthBar.layers.set(this.layer)
 
-        this.character = character
+        this.world3d.scene.add(healthBar)
+        character.add(healthBar);
         this.healthBar = healthBar
 
-        const box = new THREE.Box3().setFromObject(this.character);
-        const size = new THREE.Vector3();
-        box.getSize(size); // Get the size (width, height, depth) of the bounding box
+    }
 
-        this.size = size
+    loadCharacter = async () => {
+
+        let gltf = await this.world3d.loadModel('models/csgo_terrorist.glb', 'player-' + this.uid)
+
+        console.log('animations', gltf.animations)
+
+        this.character = gltf.scene
+        this.character.gameTag = '_character_'
+        this.character.uid = this.uid
+        console.log('character', this.character)
+        this.character.health = this.health
+
+        this.scale = 0.3
+        this.character.scale.set(this.scale, this.scale, this.scale)
+        this.character.position.set(20, 0, 20)
+
+        this.character.traverse((child) => {
+            child.layers.set(this.layer);
+        });
+
+        this.character.updateMatrixWorld(true);
+
+        
+        this.initBBox()
+
+        this.initHealthBar()
+
+        this.character.add(this.camera)
+
+        
+        const mult = 1/this.scale
+
+        this.camera.position.set(this.center.x*mult, this.size.y*mult*0.8, this.center.z*mult)
+
+        // Ensure the camera's world matrix is up-to-date
+        this.camera.updateMatrixWorld(true);
+
+        // this.camera.rotation.y = Math.PI; // 180 degrees in radians
+
+
+        // Create a vector to hold the world position
+        const worldPosition = new THREE.Vector3();
+
+        // Get the world position of the camera
+        this.camera.getWorldPosition(worldPosition);
+
+        // Now `worldPosition` holds the camera's position in world coordinates
+        console.log('World position of the camera:', worldPosition);
+
+        const forwardDirection = new THREE.Vector3(0, 1, 0); // Local Z-axis in forward direction
+        forwardDirection.applyQuaternion(this.character.quaternion); // Rotate by character's orientation
+
+        // Calculate the target position in world coordinates
+        const targetPosition = new THREE.Vector3();
+        targetPosition.copy(this.character.position).add(forwardDirection);
+
+    
+
+        // Make the camera look at this target position
+        // this.camera.lookAt(targetPosition);
+
+        //this.world3d.addSphere(worldPosition, 1)
+
+
+        this.fpsCamera = new FirstPersonCamera(this.uid, this.camera, this.character, this.world3d)
 
 
     }
@@ -114,30 +233,44 @@ export class Character {
         let gunGltf = await this.world3d.loadModel('models/weapons/csgo_weapon_m4.glb', 'gun-' + this.uid)
 
         let gun = gunGltf.scene
-      
+
         const scale = 0.0005
         gun.scale.set(scale, scale, scale)
 
         gun.sound = this.camAudioManager.getSound('blaster')
         gun.sound.setVolume(0.3)
         gun.add(gun.sound)
-      
-        
+
+
         this.camera.add(gun);
         //gun.quaternion.invert();
         // gun.position.y = 10
         gun.rotation.x = - Math.PI
         gun.rotation.z = - Math.PI
         // gun.rotation.y = - Math.PI / 12
-      
+
         gun.position.z = 0.1
         gun.position.y = -0.2
         gun.position.x = 0.1
 
+        this.gun = gun
+
         this.camera.camAudioManager = this.camAudioManager
-      
-        this.sm = new ShootingManager(this.world3d, gun, this.camera, this.camAudioManager, [this.world3d.terrain] )
+
+        this.sm = new ShootingManager(this.world3d, gun, this.camera, this.camAudioManager, [this.world3d.terrain])
         this.fpsCamera.input_.addShootingManager(this.sm)
+
+    }
+
+    hit() {
+
+        console.log('health', this.health, this.uid)
+
+        if (this.health <= 0) {
+            this.health = 100
+        } else this.health -= 20
+
+        updateHealthBar(this.healthBar, this.health / this.maxHealth)
 
     }
 
@@ -167,7 +300,7 @@ export class Character {
 
         // Position the plane in front of the camera
         bloodMesh.position.set(0, 0, -1.2); // Slightly in front of the camera
-    
+
         return bloodMesh
 
     }
@@ -177,38 +310,57 @@ export class Character {
 
         // Add the blood mesh to the camera so it appears on the screen
         this.camera.add(this.bloodMesh);
-    
+
         // Set a timeout to remove the blood effect after 1 second (1000 milliseconds)
         setTimeout(() => {
             this.camera.remove(this.bloodMesh);
         }, 3000);
-        
+
     }
 
     update = (delta) => {
 
         let fpsCamera = this.fpsCamera
         let sm = this.sm
-        let character = this.character
-        let camera = this.camera
 
         if (fpsCamera) fpsCamera.update(delta)
-    
+
         if (sm) sm.updateBullets()
-        
-    
-        if (character) {
-           this.#copyCharacterPosition()
+
+        // console.log('character', this.character.position, this.body)
+        // console.log('terrain', this.world3d.terrain.position)
+
+        if (this.boxHelper) {
+            this.boxHelper.update()
         }
+
+        this.#copyCameraRotation()
+
+        //console.log(this.sm.availableTargets)
+
+        // if (character) {
+        //     this.#copyCharacterPosition()
+        // }
     }
 
     reset() {
 
     }
 
+    #copyCameraRotation() {
+
+        this.character.children[0].rotation.z = this.camera.rotation.z - Math.PI
+
+    }
+
     #copyCharacterPosition() {
-        this.camera.position.copy(this.character.position)
-        this.camera.position.y += this.size.y 
+
+        if (this.box && this.size) {
+
+            // this.camera.position.copy(this.character.position)
+            this.camera.position.y += this.size.y * 2 / 3
+        }
+
     }
 
     #copyCameraPosition() {
@@ -221,58 +373,3 @@ export class Character {
 
 }
 
-
-export class Enemy {
-
-    constructor (world3d, sounds, object) {
-
-        this.uid = generateUUID()
-        this.health = 100
-        this.sounds = sounds
-        this.yellLow = 3
-        this.yellHigh = 6
-        this.object = object
-        this.world3d = world3d
-        this.fadeOutDuration = 5000
-
-    }
-
-    fadeOut = () => {
-
-        setTimeout(() => {
-            this.object.visible = false
-        }, this.fadeOutDuration)
-
-        const material = this.object.material;
-        material.transparent = true;
-    
-        const startTime = Date.now();
-    
-        while (material.opacity > 0) {
-
-            const elapsedTime = Date.now() - startTime;
-            const fadeAmount = 1 - (elapsedTime / duration);
-    
-            // Set the new opacity
-            material.opacity = Math.max(0, fadeAmount);
-    
-        }
-
-        this.world3d.scene.remove(this.object);
-    
-    }
-
-    yell = () => {
-
-
-        const randomDelay = Math.floor(Math.random() * (this.yellHigh - this.yellLow + 1) + this.yellLow) * 1000;
-  
-        const keys = Object.keys(this.sounds)
-
-        this.sounds[keys[Math.floor(Math.random() * keys.length)]].play()
-      
-        setTimeout(this.yell, randomDelay);
-
-    }
-
-}

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Camera } from './camera';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 const _VS = `
 varying vec3 vWorldPosition;
@@ -27,13 +29,18 @@ void main() {
 
 export class World3d {
 
-    constructor() {
+    constructor(renderer, characters, enemies) {
         
         this.scene = new THREE.Scene();
         this.loader = new GLTFLoader();
         this.models = {}
         this.cameras = {}
+        this.characters = characters
+        this.enemies = enemies
         this.terrain = null
+        this.physicsWorld = null
+        this.bodyMetadata = new Map()
+        this.renderer = renderer
 
     }
 
@@ -46,9 +53,60 @@ export class World3d {
         this.loadSun()
         this.loadSky()
         this.loadTerrain()
-        this.loadLights()
-        await this.loadModels()
 
+    }
+
+    addSphere(position, radius) {
+        // Create a sphere geometry with a specified radius, width segments, and height segments
+        const widthSegments = 32; // Number of horizontal segments
+        const heightSegments = 32; // Number of vertical segments
+        const sphereGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+
+        // Create a basic material for the sphere
+        const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Red color
+
+        // Create the mesh by combining the geometry and material
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+        // Set the position of the sphere in the scene
+        sphere.position.set(position.x, position.y, position.z); // Positioned at (0, 1, 0) in world coordinates
+
+        // Add the sphere to the scene
+        this.scene.add(sphere);
+    }
+
+    setupCameras = async () => {
+
+        //CAMERAS START
+        let camera
+        let controls
+
+        let name = 'main_camera'
+        this.cameras[name] = new Camera()
+        this.cameras[name].cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
+        this.cameras[name].controls = new OrbitControls(this.cameras[name].cam, this.renderer.domElement);
+
+        camera = this.cameras[name].cam
+        controls = this.cameras[name].controls
+
+
+        camera.position.set(30, 30, 30)
+        camera.lookAt(new THREE.Vector3(0, 0, 0))
+        camera.layers.enable(0)
+        camera.layers.enable(1)
+        camera.layers.enable(2)
+        camera.layers.enable(3)
+
+  
+        // Set up OrbitControls
+        
+        controls.target.set(0, 0, 0); // The point the camera orbits around
+        
+
+    }
+
+    update() {
+        controls.update(); // Update the controls to reflect the initial target
     }
 
     loadSun() {
@@ -134,8 +192,41 @@ export class World3d {
         this.scene.add(plane);
         this.terrain = plane;
     }
-    
 
+    setTerrainPhysics() {
+
+        // Create a ground plane physics shape
+        const planeNormal = new Ammo.btVector3(0, 1, 0); // Plane normal pointing up
+        const planeConstant = 0; // Distance from the origin, can be 0 for a ground plane at y=0
+        const planeMesh = this.terrain
+
+        const planeShape = new Ammo.btStaticPlaneShape(planeNormal, planeConstant);
+
+        const transform = new Ammo.btTransform();
+        transform.setIdentity();
+        transform.setOrigin(new Ammo.btVector3(planeMesh.position.x, planeMesh.position.y, planeMesh.position.z));
+
+        const motionState = new Ammo.btDefaultMotionState(transform);
+        const localInertia = new Ammo.btVector3(0, 0, 0); // Static objects have no inertia
+
+
+        const rbInfo = new Ammo.btRigidBodyConstructionInfo(0, motionState, planeShape, localInertia); // Mass = 0 for static objects
+        const body = new Ammo.btRigidBody(rbInfo);
+        body.isGround = true
+
+        body.setRestitution(0.1); // Low restitution for less bounce
+        body.setFriction(0.2); // High friction to slow down the bullet
+
+        body.activate()
+
+        this.bodyMetadata.set(body, {isGround: true})
+
+
+        this.terrain.body = body
+
+        return body
+    }
+    
     loadTerrain2() {
 
         const plane = new THREE.Mesh(
@@ -152,21 +243,8 @@ export class World3d {
           
     }
 
-    loadLights() {
-
-    }
-
     addCamera(camera, tag) {
         this.cameras[tag] = camera
-    }
-
-    async loadModels() {
-
-
-        // let zombie = await this.loadModel('models/zombie_female.glb', 'zombie')
-        // zombie.scale.set(0.1, 0.1, 0.1)
-        // this.models.zombie = zombie
-
     }
 
     loadModel = (path, name) => {
@@ -195,10 +273,5 @@ export class World3d {
         });
     
     }
-
-    loadCameras() {
-        
-    }
-    
     
 }
